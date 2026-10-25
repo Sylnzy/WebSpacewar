@@ -123,7 +123,7 @@ export class BotAI {
     };
   }
 
-  private planHard(myPlanets: Planet[], targets: Planet[], state: GameState): AIAction | null {
+  private planHard(myPlanets: Planet[], targets: Planet[], _state: GameState): AIAction | null {
     // 1. Opportunistic counter-attack: check if an enemy planet has very low defense
     const enemyPlanets = targets.filter((t) => t.owner !== 'neutral');
     const vulnerableEnemy = enemyPlanets.find((ep) => ep.units <= 12);

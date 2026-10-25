@@ -1,4 +1,4 @@
-import { Planet, Fleet, PlanetOwner, GameState, GameStatus, CombatResult } from './Types';
+import { Planet, Fleet, PlanetOwner, GameState, CombatResult } from './Types';
 import { resolveCombat } from './CombatResolver';
 
 export type CombatCallback = (result: CombatResult, planet: Planet, fleet: Fleet) => void;

@@ -9,8 +9,6 @@ export interface Star {
 
 export class Starfield {
   private stars: Star[] = [];
-  private width: number = 0;
-  private height: number = 0;
 
   constructor(count: number = 140) {
     this.initStars(count);
@@ -42,9 +40,6 @@ export class Starfield {
   }
 
   public render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-    this.width = width;
-    this.height = height;
-
     // Deep cosmic space gradient
     const bgGradient = ctx.createRadialGradient(
       width / 2,
