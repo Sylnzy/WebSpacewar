@@ -1,0 +1,306 @@
+import { GameState, PlanetOwner } from '../core/Types';
+import { AIDifficulty } from '../ai/BotAI';
+
+export interface UICallbacks {
+  onStartSolo: (diff: AIDifficulty) => void;
+  onHostGame: () => void;
+  onJoinGame: (code: string) => void;
+  onRatioSelect: (ratio: number) => void;
+  onSelectAll: () => void;
+  onToggleMute: () => boolean;
+  onSurrender: () => void;
+  onPlayAgain: () => void;
+  onBackToMenu: () => void;
+}
+
+export class UIManager {
+  private container: HTMLElement;
+  private callbacks: UICallbacks;
+  private currentRatio: number = 0.5;
+  private selectedDifficulty: AIDifficulty = 'medium';
+
+  constructor(container: HTMLElement, callbacks: UICallbacks) {
+    this.container = container;
+    this.callbacks = callbacks;
+  }
+
+  public showMainMenu(): void {
+    this.container.innerHTML = `
+      <div class="glass-panel screen-modal">
+        <h1 class="game-title">SPACE CONQUEST</h1>
+        <p class="game-subtitle">Taktik Galaksi Real-Time RTS</p>
+
+        <!-- Mode Solo vs AI -->
+        <div class="menu-section">
+          <div class="section-title">Mode Solo vs AI</div>
+          <div class="btn-group" style="margin-bottom: 12px;">
+            <button class="btn ${this.selectedDifficulty === 'easy' ? 'active' : ''}" id="btn-diff-easy">Easy</button>
+            <button class="btn ${this.selectedDifficulty === 'medium' ? 'active' : ''}" id="btn-diff-med">Medium</button>
+            <button class="btn ${this.selectedDifficulty === 'hard' ? 'active' : ''}" id="btn-diff-hard">Hard</button>
+          </div>
+          <button class="btn btn-cyan" id="btn-start-solo" style="width: 100%;">Mulai Game Solo</button>
+        </div>
+
+        <!-- Mode Multiplayer P2P -->
+        <div class="menu-section">
+          <div class="section-title">Multiplayer Online (WebRTC P2P)</div>
+          <button class="btn btn-magenta" id="btn-host-game" style="width: 100%; margin-bottom: 10px;">Host Buat Room</button>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="input-room-code" class="input-box" placeholder="SP-XXXX" maxlength="10" />
+            <button class="btn btn-cyan" id="btn-join-game" style="flex-shrink: 0;">Join</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bind difficulty selection
+    const diffButtons: Record<AIDifficulty, HTMLElement | null> = {
+      easy: document.getElementById('btn-diff-easy'),
+      medium: document.getElementById('btn-diff-med'),
+      hard: document.getElementById('btn-diff-hard'),
+    };
+
+    const setDiff = (d: AIDifficulty) => {
+      this.selectedDifficulty = d;
+      Object.entries(diffButtons).forEach(([key, btn]) => {
+        if (btn) btn.className = `btn ${key === d ? 'active' : ''}`;
+      });
+    };
+
+    diffButtons.easy?.addEventListener('click', () => setDiff('easy'));
+    diffButtons.medium?.addEventListener('click', () => setDiff('medium'));
+    diffButtons.hard?.addEventListener('click', () => setDiff('hard'));
+
+    document.getElementById('btn-start-solo')?.addEventListener('click', () => {
+      this.callbacks.onStartSolo(this.selectedDifficulty);
+    });
+
+    document.getElementById('btn-host-game')?.addEventListener('click', () => {
+      this.callbacks.onHostGame();
+    });
+
+    document.getElementById('btn-join-game')?.addEventListener('click', () => {
+      const codeInput = document.getElementById('input-room-code') as HTMLInputElement;
+      const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
+      if (code) {
+        this.callbacks.onJoinGame(code);
+      }
+    });
+  }
+
+  public showLobbyHost(roomCode: string): void {
+    this.container.innerHTML = `
+      <div class="glass-panel screen-modal">
+        <h2 class="game-title" style="font-size: 26px;">ROOM MULTIPLAYER</h2>
+        <p class="game-subtitle">Bagikan kode berikut ke lawan Anda</p>
+
+        <div class="code-pill" id="copy-code-btn" title="Klik untuk menyalin">
+          <span>${roomCode}</span>
+          <span style="font-size: 13px; opacity: 0.8;">📋 Salin</span>
+        </div>
+
+        <p id="copy-feedback" style="font-size: 12px; color: var(--cyan); height: 16px; margin-bottom: 16px;"></p>
+
+        <div class="hud-badge" style="display: inline-block; margin-bottom: 20px;">
+          ⏳ Menunggu Pemain 2 Terhubung...
+        </div>
+
+        <div>
+          <button class="btn" id="btn-cancel-lobby">Batal</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('copy-code-btn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(roomCode);
+      const feedback = document.getElementById('copy-feedback');
+      if (feedback) feedback.textContent = 'Kode disalin ke clipboard!';
+    });
+
+    document.getElementById('btn-cancel-lobby')?.addEventListener('click', () => {
+      this.callbacks.onBackToMenu();
+    });
+  }
+
+  public showLobbyGuest(): void {
+    this.container.innerHTML = `
+      <div class="glass-panel screen-modal">
+        <h2 class="game-title" style="font-size: 26px;">MENGHUBUNGKAN...</h2>
+        <p class="game-subtitle">Menghubungkan ke WebRTC Host...</p>
+        <div class="hud-badge" style="display: inline-block; margin: 16px 0;">
+          🔄 Mengirim Handshake P2P...
+        </div>
+        <div>
+          <button class="btn" id="btn-cancel-guest">Batal</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-cancel-guest')?.addEventListener('click', () => {
+      this.callbacks.onBackToMenu();
+    });
+  }
+
+  public showHUD(isMultiplayer: boolean = false, playerRole: PlanetOwner = 'player1'): void {
+    this.container.innerHTML = `
+      <div id="hud-top">
+        <div class="hud-badge" id="hud-player-badge">
+          ${playerRole === 'player1' ? '🔷 ANDA: CYAN' : '🔴 ANDA: MAGENTA'}
+        </div>
+
+        <div class="dominance-container" title="Dominasi Galaksi">
+          <div class="dominance-p1" id="dom-p1" style="width: 50%;"></div>
+          <div class="dominance-p2" id="dom-p2" style="width: 50%;"></div>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="hud-badge" id="hud-ping-badge">
+            ${isMultiplayer ? 'P2P: -- ms' : 'SOLO AI'}
+          </div>
+          <button class="btn" id="btn-mute" style="padding: 6px 10px; font-size: 16px;">🔊</button>
+        </div>
+      </div>
+
+      <div id="hud-bottom">
+        <div class="ratio-selector">
+          <button class="btn ratio-btn ${this.currentRatio === 0.25 ? 'active' : ''}" data-ratio="0.25">25%</button>
+          <button class="btn ratio-btn ${this.currentRatio === 0.50 ? 'active' : ''}" data-ratio="0.50">50%</button>
+          <button class="btn ratio-btn ${this.currentRatio === 0.75 ? 'active' : ''}" data-ratio="0.75">75%</button>
+          <button class="btn ratio-btn ${this.currentRatio === 1.00 ? 'active' : ''}" data-ratio="1.00">100%</button>
+        </div>
+        <button class="btn" id="btn-select-all" title="Pilih Semua Planet (A)">Pilih Semua</button>
+        <button class="btn" id="btn-surrender" style="background: rgba(255, 0, 0, 0.2); border-color: #ff3344;">Menyerah</button>
+      </div>
+    `;
+
+    // Bind ratio buttons
+    const ratioBtns = document.querySelectorAll('.ratio-btn');
+    ratioBtns.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const ratio = parseFloat(target.dataset.ratio || '0.5');
+        this.setRatio(ratio);
+        this.callbacks.onRatioSelect(ratio);
+      });
+    });
+
+    document.getElementById('btn-select-all')?.addEventListener('click', () => {
+      this.callbacks.onSelectAll();
+    });
+
+    document.getElementById('btn-mute')?.addEventListener('click', (e) => {
+      const isMuted = this.callbacks.onToggleMute();
+      (e.currentTarget as HTMLElement).textContent = isMuted ? '🔇' : '🔊';
+    });
+
+    document.getElementById('btn-surrender')?.addEventListener('click', () => {
+      if (confirm('Apakah Anda yakin ingin menyerah?')) {
+        this.callbacks.onSurrender();
+      }
+    });
+  }
+
+  public setRatio(ratio: number): void {
+    this.currentRatio = ratio;
+    const ratioBtns = document.querySelectorAll('.ratio-btn');
+    ratioBtns.forEach((btn) => {
+      const btnRatio = parseFloat((btn as HTMLElement).dataset.ratio || '0.5');
+      if (Math.abs(btnRatio - ratio) < 0.05) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  public updateHUD(state: GameState, pingMs?: number): void {
+    // Dominance calculation
+    let p1Total = 0;
+    let p2Total = 0;
+
+    for (const p of state.planets) {
+      if (p.owner === 'player1') p1Total += p.units;
+      if (p.owner === 'player2') p2Total += p.units;
+    }
+    for (const f of state.fleets) {
+      if (f.owner === 'player1') p1Total += f.units;
+      if (f.owner === 'player2') p2Total += f.units;
+    }
+
+    const total = p1Total + p2Total;
+    const p1Pct = total > 0 ? (p1Total / total) * 100 : 50;
+    const p2Pct = 100 - p1Pct;
+
+    const domP1 = document.getElementById('dom-p1');
+    const domP2 = document.getElementById('dom-p2');
+    if (domP1 && domP2) {
+      domP1.style.width = `${p1Pct.toFixed(1)}%`;
+      domP2.style.width = `${p2Pct.toFixed(1)}%`;
+    }
+
+    if (pingMs !== undefined) {
+      const pingBadge = document.getElementById('hud-ping-badge');
+      if (pingBadge) {
+        pingBadge.textContent = `P2P: ${pingMs} ms`;
+      }
+    }
+  }
+
+  public showGameOver(
+    winner: PlanetOwner,
+    playerRole: PlanetOwner,
+    stats: { duration: number; deployed: number; captured: number }
+  ): void {
+    const isVictory = winner === playerRole;
+    const formatTime = (sec: number) => {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+    };
+
+    const modal = document.createElement('div');
+    modal.className = 'glass-panel screen-modal';
+    modal.innerHTML = `
+      <div class="result-header ${isVictory ? 'result-victory' : 'result-defeat'}">
+        ${isVictory ? '🏆 KEMENANGAN TOTAL!' : '💥 ARMADA HANCUR!'}
+      </div>
+      <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 18px;">
+        ${isVictory ? 'Anda berhasil menguasai seluruh tata surya.' : 'Musuh telah menaklukkan seluruh planet Anda.'}
+      </p>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value">${formatTime(stats.duration)}</div>
+          <div class="stat-label">Durasi Pertempuran</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.deployed}</div>
+          <div class="stat-label">Pasukan Dikerahkan</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${stats.captured}</div>
+          <div class="stat-label">Planet Direbut</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${isVictory ? '100%' : '0%'}</div>
+          <div class="stat-label">Dominasi Akhir</div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-cyan" id="btn-play-again">Main Lagi</button>
+        <button class="btn" id="btn-gameover-menu">Menu Utama</button>
+      </div>
+    `;
+
+    this.container.appendChild(modal);
+
+    document.getElementById('btn-play-again')?.addEventListener('click', () => {
+      this.callbacks.onPlayAgain();
+    });
+
+    document.getElementById('btn-gameover-menu')?.addEventListener('click', () => {
+      this.callbacks.onBackToMenu();
+    });
+  }
+}

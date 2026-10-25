@@ -1,0 +1,327 @@
+:root {
+  --bg-dark: #05070f;
+  --cyan: #00f0ff;
+  --cyan-glow: rgba(0, 240, 255, 0.4);
+  --magenta: #ff007f;
+  --magenta-glow: rgba(255, 0, 127, 0.4);
+  --yellow: #ffe600;
+  --surface: rgba(10, 15, 28, 0.75);
+  --surface-border: rgba(0, 240, 255, 0.25);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* UI Overlay Container */
+#ui-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* children enable pointer events */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Common Card & Modal Styles */
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 16px rgba(0, 240, 255, 0.05);
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--cyan-glow);
+}
+
+.btn-cyan {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.btn-cyan:hover {
+  background: var(--cyan);
+  color: #000;
+  box-shadow: 0 0 20px var(--cyan-glow);
+}
+
+.btn-magenta {
+  background: rgba(255, 0, 127, 0.15);
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+
+.btn-magenta:hover {
+  background: var(--magenta);
+  color: #fff;
+  box-shadow: 0 0 20px var(--magenta-glow);
+}
+
+.btn.active {
+  background: var(--cyan);
+  color: #000;
+  box-shadow: 0 0 16px var(--cyan-glow);
+}
+
+/* Screen: Main Menu */
+.screen-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 480px;
+  padding: 32px 28px;
+  text-align: center;
+  z-index: 100;
+}
+
+.game-title {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--magenta) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+  text-shadow: 0 0 30px var(--cyan-glow);
+}
+
+.game-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+
+.menu-section {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.input-box {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  color: #fff;
+  font-family: monospace;
+  font-size: 15px;
+  text-transform: uppercase;
+  text-align: center;
+  outline: none;
+  margin-bottom: 10px;
+}
+
+.input-box:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* In-Game HUD */
+#hud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  pointer-events: auto;
+}
+
+.dominance-container {
+  flex: 1;
+  max-width: 380px;
+  margin: 0 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 4px;
+  display: flex;
+  height: 22px;
+  overflow: hidden;
+}
+
+.dominance-p1 {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-glow);
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 8px 0 0 8px;
+}
+
+.dominance-p2 {
+  background: var(--magenta);
+  box-shadow: 0 0 10px var(--magenta-glow);
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 0 8px 8px 0;
+}
+
+.hud-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+#hud-bottom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  pointer-events: auto;
+}
+
+.ratio-selector {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ratio-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Modal Victory / Defeat */
+.result-header {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.result-victory {
+  color: var(--cyan);
+  text-shadow: 0 0 25px var(--cyan-glow);
+}
+
+.result-defeat {
+  color: var(--magenta);
+  text-shadow: 0 0 25px var(--magenta-glow);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 24px 0;
+}
+
+.stat-item {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* Copy Room Code Pill */
+.code-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px dashed var(--cyan);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cyan);
+  margin: 10px 0;
+  cursor: pointer;
+}
