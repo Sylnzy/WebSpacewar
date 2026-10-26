@@ -10,6 +10,9 @@ import { PlanetOwner, GameState } from './core/Types';
 
 type GameMode = 'menu' | 'solo' | 'multiplayer-host' | 'multiplayer-guest';
 
+const WORLD_WIDTH = 1400;
+const WORLD_HEIGHT = 900;
+
 class GameApp {
   private canvas: HTMLCanvasElement;
   private uiContainer: HTMLElement;
@@ -71,11 +74,21 @@ class GameApp {
       onSurrender: () => this.surrender(),
       onPlayAgain: () => this.restartGame(),
       onBackToMenu: () => this.returnToMenu(),
+      onZoomIn: () => {
+        this.renderer.camera.zoomAt(this.renderer.getWidth() / 2, this.renderer.getHeight() / 2, 1.25);
+      },
+      onZoomOut: () => {
+        this.renderer.camera.zoomAt(this.renderer.getWidth() / 2, this.renderer.getHeight() / 2, 0.8);
+      },
+      onResetZoom: () => {
+        this.fitMapToScreen();
+      },
     });
 
     this.input = new InputController(
       this.canvas,
       () => this.engine.getState(),
+      this.renderer.camera,
       this.playerRole,
       {
         onDispatch: (fromIds, toId, ratio) => this.handleDispatch(fromIds, toId, ratio),
@@ -99,6 +112,12 @@ class GameApp {
 
     this.setupEngineHooks();
     this.ui.showMainMenu();
+
+    window.addEventListener('resize', () => {
+      if (this.mode !== 'menu' && this.engine.getState().status === 'running') {
+        this.fitMapToScreen();
+      }
+    });
 
     // Start requestAnimationFrame loop
     requestAnimationFrame((t) => this.loop(t));
@@ -147,6 +166,18 @@ class GameApp {
     };
   }
 
+  public fitMapToScreen(): void {
+    const state = this.engine.getState();
+    if (state.planets && state.planets.length > 0) {
+      this.renderer.camera.fitToPlanets(
+        this.renderer.getWidth(),
+        this.renderer.getHeight(),
+        state.planets,
+        45
+      );
+    }
+  }
+
   public startSoloGame(diff: AIDifficulty, playerCount: number = 2): void {
     soundManager.init();
     this.mode = 'solo';
@@ -156,13 +187,12 @@ class GameApp {
     this.input.setPlayerOwner('player1');
     this.resetStats();
 
-    const width = this.renderer.getWidth();
-    const height = this.renderer.getHeight();
     const totalPlanets = 10 + (playerCount - 2) * 3;
-    const planets = generateMap(width, height, totalPlanets, Date.now(), playerCount);
+    const planets = generateMap(WORLD_WIDTH, WORLD_HEIGHT, totalPlanets, Date.now(), playerCount);
 
     this.engine = new GameEngine(planets);
     this.setupEngineHooks();
+    this.fitMapToScreen();
 
     this.bots = [];
     const botOwners: PlanetOwner[] = ['player2', 'player3', 'player4', 'player5'];
@@ -230,14 +260,13 @@ class GameApp {
     const playerCount = players.length;
     this.currentPlayerCount = playerCount;
 
-    const width = this.renderer.getWidth();
-    const height = this.renderer.getHeight();
     const seed = Date.now();
     const totalPlanets = 10 + (playerCount - 2) * 3;
-    const planets = generateMap(width, height, totalPlanets, seed, playerCount);
+    const planets = generateMap(WORLD_WIDTH, WORLD_HEIGHT, totalPlanets, seed, playerCount);
 
     this.engine = new GameEngine(planets);
     this.setupEngineHooks();
+    this.fitMapToScreen();
     this.engine.start();
 
     this.network.broadcast({
@@ -278,6 +307,7 @@ class GameApp {
       this.currentPlayerCount = playerCount;
       this.engine = new GameEngine(planets);
       this.setupEngineHooks();
+      this.fitMapToScreen();
       this.engine.start();
       this.ui.showHUD(true, this.playerRole);
     } else if (netMsg.type === 'COMMAND_DISPATCH') {

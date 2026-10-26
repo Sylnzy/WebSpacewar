@@ -12,6 +12,9 @@ export interface UICallbacks {
   onSurrender: () => void;
   onPlayAgain: () => void;
   onBackToMenu: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onResetZoom?: () => void;
 }
 
 export class UIManager {
@@ -412,6 +415,12 @@ export class UIManager {
         <button class="btn" id="btn-select-all" title="Pilih Semua Planet (A)">Pilih Semua</button>
         <button class="btn" id="btn-surrender" style="background: rgba(255, 0, 0, 0.2); border-color: #ff3344;">Menyerah</button>
       </div>
+
+      <div id="hud-camera-controls">
+        <button class="btn btn-hud-cam" id="btn-zoom-in" title="Perbesar (+)">+</button>
+        <button class="btn btn-hud-cam" id="btn-zoom-out" title="Perkecil (−)">−</button>
+        <button class="btn btn-hud-cam" id="btn-zoom-fit" title="Pas Layar (Fit)">Fit</button>
+      </div>
     `;
 
     // Bind ratio buttons
@@ -438,6 +447,18 @@ export class UIManager {
       if (confirm('Apakah Anda yakin ingin menyerah?')) {
         this.callbacks.onSurrender();
       }
+    });
+
+    document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
+      this.callbacks.onZoomIn?.();
+    });
+
+    document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
+      this.callbacks.onZoomOut?.();
+    });
+
+    document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
+      this.callbacks.onResetZoom?.();
     });
   }
 

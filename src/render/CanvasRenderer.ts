@@ -1,6 +1,7 @@
 import { GameState, Planet, Fleet, PlanetOwner } from '../core/Types';
 import { Starfield } from './Starfield';
 import { ParticleSystem } from './ParticleSystem';
+import { Camera } from './Camera';
 
 export interface DragTargetVisual {
   fromPlanetIds: string[];
@@ -15,6 +16,7 @@ export class CanvasRenderer {
   private ctx: CanvasRenderingContext2D;
   private starfield: Starfield;
   public particles: ParticleSystem;
+  public camera: Camera;
 
   private dpr: number = 1;
   private animTimer: number = 0;
@@ -62,6 +64,7 @@ export class CanvasRenderer {
     this.ctx = context;
     this.starfield = new Starfield();
     this.particles = new ParticleSystem();
+    this.camera = new Camera();
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -101,8 +104,13 @@ export class CanvasRenderer {
 
     this.ctx.clearRect(0, 0, width, height);
 
-    // 1. Starfield Background
+    // 1. Starfield Background (fullscreen screen space)
     this.starfield.render(this.ctx, width, height);
+
+    // Apply Camera Viewport Matrix for World Entities
+    this.ctx.save();
+    this.ctx.translate(this.camera.x, this.camera.y);
+    this.ctx.scale(this.camera.zoom, this.camera.zoom);
 
     // 2. Aiming Laser & Drag Targets
     if (dragVisual && dragVisual.fromPlanetIds.length > 0) {
@@ -122,6 +130,8 @@ export class CanvasRenderer {
 
     // 5. Render Particle FX
     this.particles.render(this.ctx);
+
+    this.ctx.restore();
   }
 
   private renderPlanet(planet: Planet, isSelected: boolean): void {
