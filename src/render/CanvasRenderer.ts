@@ -285,23 +285,27 @@ export class CanvasRenderer {
       ctx.shadowColor = theme.primary;
       ctx.stroke();
 
-      // Estimated send count badge
+      // Estimated send count badge (counter-scaled so it stays visible on small screens & zoom-out)
       const unitsToSend = Math.floor(source.units * drag.ratio);
       if (unitsToSend > 0) {
         const midX = (source.x + drag.toX) / 2;
         const midY = (source.y + drag.toY) / 2;
 
-        ctx.fillStyle = 'rgba(5, 10, 20, 0.85)';
+        const invZoom = 1 / Math.max(0.2, this.camera.zoom);
+        const radius = Math.max(13, 14 * invZoom);
+        const fontSize = Math.max(11, Math.round(11 * invZoom));
+
+        ctx.fillStyle = 'rgba(5, 10, 20, 0.9)';
         ctx.beginPath();
-        ctx.arc(midX, midY, 13, 0, Math.PI * 2);
+        ctx.arc(midX, midY, radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = theme.primary;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = Math.max(1.5, 1.8 * invZoom);
         ctx.setLineDash([]);
         ctx.stroke();
 
         ctx.fillStyle = '#ffffff';
-        ctx.font = `700 11px sans-serif`;
+        ctx.font = `800 ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(`${unitsToSend}`, midX, midY);

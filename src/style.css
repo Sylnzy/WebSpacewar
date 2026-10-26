@@ -22,7 +22,10 @@
 html, body {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  position: fixed;
+  inset: 0;
   background-color: var(--bg-dark);
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -30,8 +33,10 @@ html, body {
 
 #app {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 #game-canvas {
@@ -614,27 +619,52 @@ html, body {
 }
 
 #hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 10px;
-  padding: 16px;
+  padding: 10px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  background: linear-gradient(to top, rgba(5, 7, 15, 0.95) 0%, rgba(5, 7, 15, 0.7) 65%, transparent 100%);
   pointer-events: auto;
+  z-index: 95;
 }
 
 .ratio-selector {
   display: flex;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.7);
   padding: 4px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
 .ratio-btn {
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 700;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  color: var(--text-muted);
+}
+
+.ratio-btn:hover {
+  color: var(--text-main);
+  background: rgba(0, 240, 255, 0.15);
+}
+
+.ratio-btn.active {
+  background: var(--cyan);
+  color: #03101c;
+  font-weight: 800;
+  box-shadow: 0 0 14px var(--cyan-glow);
+  border-color: #00f0ff;
 }
 
 /* Modal Victory / Defeat */
@@ -765,7 +795,7 @@ html, body {
 #hud-camera-controls {
   position: absolute;
   right: 16px;
-  bottom: 84px;
+  bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 56px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -806,30 +836,49 @@ html, body {
 }
 
 @media (max-width: 640px) {
+  #hud-bottom {
+    padding: 6px 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    gap: 6px;
+    justify-content: space-between;
+  }
+
+  .ratio-selector {
+    gap: 3px;
+    padding: 2px;
+  }
+
+  .ratio-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+    min-width: 36px;
+  }
+
+  #btn-select-all {
+    padding: 6px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  #btn-surrender {
+    padding: 6px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
   #hud-camera-controls {
     right: 10px;
-    bottom: 86px;
+    bottom: calc(max(8px, env(safe-area-inset-bottom, 8px)) + 52px);
     gap: 6px;
   }
+
   .btn-hud-cam {
     width: 38px;
     height: 38px;
     font-size: 16px;
   }
+
   #btn-zoom-fit {
-    font-size: 11px;
-  }
-  #hud-bottom {
-    padding: 8px;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-  .ratio-btn {
-    padding: 6px 8px;
-    font-size: 11px;
-  }
-  #btn-select-all, #btn-surrender {
-    padding: 6px 10px;
     font-size: 11px;
   }
 }

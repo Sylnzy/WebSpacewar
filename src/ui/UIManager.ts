@@ -460,6 +460,8 @@ export class UIManager {
     document.getElementById('btn-zoom-fit')?.addEventListener('click', () => {
       this.callbacks.onResetZoom?.();
     });
+
+    this.setRatio(this.currentRatio);
   }
 
   public setRatio(ratio: number): void {
