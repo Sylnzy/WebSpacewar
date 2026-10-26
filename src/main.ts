@@ -18,7 +18,8 @@ class GameApp {
   private input: InputController;
   private network: NetworkManager;
   private ui: UIManager;
-  private bot: BotAI | null = null;
+  private bots: BotAI[] = [];
+  private currentPlayerCount: number = 2;
 
   private mode: GameMode = 'menu';
   private playerRole: PlanetOwner = 'player1';
@@ -54,7 +55,7 @@ class GameApp {
     });
 
     this.ui = new UIManager(this.uiContainer, {
-      onStartSolo: (diff) => this.startSoloGame(diff),
+      onStartSolo: (diff, count) => this.startSoloGame(diff, count),
       onHostGame: () => this.startHostLobby(),
       onJoinGame: (code) => this.joinLobby(code),
       onRatioSelect: (ratio) => {
@@ -101,10 +102,19 @@ class GameApp {
   }
 
   private setupEngineHooks(): void {
+    const factionColors: Record<PlanetOwner, string> = {
+      player1: '#00f0ff',
+      player2: '#ff007f',
+      player3: '#ffe600',
+      player4: '#00ff66',
+      player5: '#b84dff',
+      neutral: '#94a3b8',
+    };
+
     this.engine.onCombatResult = (result, planet) => {
       if (result.conquered) {
         soundManager.playCapture();
-        const color = result.newOwner === 'player1' ? '#00f0ff' : result.newOwner === 'player2' ? '#ff007f' : '#94a3b8';
+        const color = factionColors[result.newOwner] || '#ffffff';
         this.renderer.particles.spawnExplosion(planet.x, planet.y, color, 30);
         if (result.newOwner === this.playerRole) {
           this.stats.captured++;
@@ -134,21 +144,28 @@ class GameApp {
     };
   }
 
-  public startSoloGame(diff: AIDifficulty): void {
+  public startSoloGame(diff: AIDifficulty, playerCount: number = 2): void {
     soundManager.init();
     this.mode = 'solo';
     this.playerRole = 'player1';
     this.currentDifficulty = diff;
+    this.currentPlayerCount = playerCount;
     this.input.setPlayerOwner('player1');
     this.resetStats();
 
     const width = this.renderer.getWidth();
     const height = this.renderer.getHeight();
-    const planets = generateMap(width, height, 11, Date.now());
+    const totalPlanets = 10 + (playerCount - 2) * 3;
+    const planets = generateMap(width, height, totalPlanets, Date.now(), playerCount);
 
     this.engine = new GameEngine(planets);
     this.setupEngineHooks();
-    this.bot = new BotAI('player2', diff);
+
+    this.bots = [];
+    const botOwners: PlanetOwner[] = ['player2', 'player3', 'player4', 'player5'];
+    for (let i = 1; i < playerCount; i++) {
+      this.bots.push(new BotAI(botOwners[i - 1], diff));
+    }
 
     this.engine.start();
     this.ui.showHUD(false, 'player1');
@@ -246,7 +263,7 @@ class GameApp {
     if (this.mode === 'multiplayer-host' || this.mode === 'multiplayer-guest') {
       alert(`Koneksi terputus: ${reason || 'Lawan keluar'}. Mengalihkan pertandingan ke Bot AI.`);
       this.mode = 'solo';
-      this.bot = new BotAI(this.playerRole === 'player1' ? 'player2' : 'player1', 'medium');
+      this.bots = [new BotAI(this.playerRole === 'player1' ? 'player2' : 'player1', 'medium')];
       this.ui.showHUD(false, this.playerRole);
     }
   }
@@ -298,7 +315,7 @@ class GameApp {
 
   private restartGame(): void {
     if (this.mode === 'solo') {
-      this.startSoloGame(this.currentDifficulty);
+      this.startSoloGame(this.currentDifficulty, this.currentPlayerCount);
     } else {
       this.returnToMenu();
     }
@@ -307,7 +324,7 @@ class GameApp {
   private returnToMenu(): void {
     this.mode = 'menu';
     this.network.disconnect();
-    this.bot = null;
+    this.bots = [];
     this.engine.clearSelection();
     this.ui.showMainMenu();
   }
@@ -317,16 +334,16 @@ class GameApp {
     this.lastTime = timestamp;
 
     if (this.mode === 'solo') {
-      // Host authoritative simulation & Bot AI
+      // Host authoritative simulation & Multi-Bot AI
       this.engine.update(dt);
-      if (this.bot) {
-        const action = this.bot.update(dt, this.engine.getState());
+      for (const bot of this.bots) {
+        const action = bot.update(dt, this.engine.getState());
         if (action) {
           const sent = this.engine.dispatchFleet(
             action.fromPlanetIds,
             action.toPlanetId,
             action.ratio,
-            'player2'
+            bot.getOwner()
           );
           if (sent) soundManager.playDispatch();
         }

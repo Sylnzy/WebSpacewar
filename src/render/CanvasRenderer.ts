@@ -31,6 +31,21 @@ export class CanvasRenderer {
       glow: 'rgba(255, 0, 127, 0.6)',
       dark: '#3d0520',
     },
+    player3: {
+      primary: '#ffe600',
+      glow: 'rgba(255, 230, 0, 0.6)',
+      dark: '#3d3505',
+    },
+    player4: {
+      primary: '#00ff66',
+      glow: 'rgba(0, 255, 102, 0.6)',
+      dark: '#033816',
+    },
+    player5: {
+      primary: '#b84dff',
+      glow: 'rgba(184, 77, 255, 0.6)',
+      dark: '#2a083d',
+    },
     neutral: {
       primary: '#94a3b8',
       glow: 'rgba(148, 163, 184, 0.3)',

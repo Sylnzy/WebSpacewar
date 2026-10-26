@@ -20,6 +20,10 @@ export class BotAI {
     this.interval = this.getInterval(difficulty);
   }
 
+  public getOwner(): PlanetOwner {
+    return this.owner;
+  }
+
   private getInterval(difficulty: AIDifficulty): number {
     switch (difficulty) {
       case 'easy':

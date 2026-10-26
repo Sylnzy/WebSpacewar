@@ -2,7 +2,7 @@ import { GameState, PlanetOwner } from '../core/Types';
 import { AIDifficulty } from '../ai/BotAI';
 
 export interface UICallbacks {
-  onStartSolo: (diff: AIDifficulty) => void;
+  onStartSolo: (diff: AIDifficulty, playerCount: number) => void;
   onHostGame: () => void;
   onJoinGame: (code: string) => void;
   onRatioSelect: (ratio: number) => void;
@@ -18,6 +18,7 @@ export class UIManager {
   private callbacks: UICallbacks;
   private currentRatio: number = 0.5;
   private selectedDifficulty: AIDifficulty = 'medium';
+  private selectedPlayerCount: number = 2;
   private menuCleanup: (() => void) | null = null;
 
   constructor(container: HTMLElement, callbacks: UICallbacks) {
@@ -158,12 +159,22 @@ export class UIManager {
                 <span class="section-icon">⚔️</span>
                 <div class="section-title">Mode Solo vs AI</div>
               </div>
-              <div class="btn-group diff-selector" style="margin-bottom: 12px;">
+
+              <div class="section-sublabel">Jumlah Faksi (Free-For-All)</div>
+              <div class="btn-group count-selector" style="margin-bottom: 12px;">
+                <button class="btn count-btn ${this.selectedPlayerCount === 2 ? 'active' : ''}" id="btn-count-2">2 (1v1)</button>
+                <button class="btn count-btn ${this.selectedPlayerCount === 3 ? 'active' : ''}" id="btn-count-3">3 Faksi</button>
+                <button class="btn count-btn ${this.selectedPlayerCount === 4 ? 'active' : ''}" id="btn-count-4">4 Faksi</button>
+                <button class="btn count-btn ${this.selectedPlayerCount === 5 ? 'active' : ''}" id="btn-count-5">5 Faksi</button>
+              </div>
+
+              <div class="section-sublabel">Tingkat Kesulitan AI</div>
+              <div class="btn-group diff-selector" style="margin-bottom: 14px;">
                 <button class="btn diff-btn ${this.selectedDifficulty === 'easy' ? 'active' : ''}" id="btn-diff-easy">Easy</button>
                 <button class="btn diff-btn ${this.selectedDifficulty === 'medium' ? 'active' : ''}" id="btn-diff-med">Medium</button>
                 <button class="btn diff-btn ${this.selectedDifficulty === 'hard' ? 'active' : ''}" id="btn-diff-hard">Hard</button>
               </div>
-              <button class="btn btn-cyan btn-glow" id="btn-start-solo" style="width: 100%;">Mulai Game Solo</button>
+              <button class="btn btn-cyan btn-glow" id="btn-start-solo" style="width: 100%;">Mulai Pertempuran Galaksi</button>
             </div>
 
             <!-- Mode Multiplayer P2P -->
@@ -213,12 +224,31 @@ export class UIManager {
       });
     };
 
+    // Bind player count selection
+    const countButtons: Record<number, HTMLElement | null> = {
+      2: document.getElementById('btn-count-2'),
+      3: document.getElementById('btn-count-3'),
+      4: document.getElementById('btn-count-4'),
+      5: document.getElementById('btn-count-5'),
+    };
+
+    const setCount = (c: number) => {
+      this.selectedPlayerCount = c;
+      Object.entries(countButtons).forEach(([key, btn]) => {
+        if (btn) btn.className = `btn count-btn ${parseInt(key) === c ? 'active' : ''}`;
+      });
+    };
+
+    [2, 3, 4, 5].forEach((c) => {
+      countButtons[c]?.addEventListener('click', () => setCount(c));
+    });
+
     diffButtons.easy?.addEventListener('click', () => setDiff('easy'));
     diffButtons.medium?.addEventListener('click', () => setDiff('medium'));
     diffButtons.hard?.addEventListener('click', () => setDiff('hard'));
 
     document.getElementById('btn-start-solo')?.addEventListener('click', () => {
-      this.callbacks.onStartSolo(this.selectedDifficulty);
+      this.callbacks.onStartSolo(this.selectedDifficulty, this.selectedPlayerCount);
     });
 
     document.getElementById('btn-host-game')?.addEventListener('click', () => {
@@ -297,9 +327,12 @@ export class UIManager {
           ${playerRole === 'player1' ? '🔷 ANDA: CYAN' : '🔴 ANDA: MAGENTA'}
         </div>
 
-        <div class="dominance-container" title="Dominasi Galaksi">
-          <div class="dominance-p1" id="dom-p1" style="width: 50%;"></div>
-          <div class="dominance-p2" id="dom-p2" style="width: 50%;"></div>
+        <div class="dominance-container" id="dominance-container" title="Dominasi Galaksi">
+          <div class="dominance-segment dom-p1" id="dom-p1" style="width: 20%;"></div>
+          <div class="dominance-segment dom-p2" id="dom-p2" style="width: 20%;"></div>
+          <div class="dominance-segment dom-p3" id="dom-p3" style="width: 20%;"></div>
+          <div class="dominance-segment dom-p4" id="dom-p4" style="width: 20%;"></div>
+          <div class="dominance-segment dom-p5" id="dom-p5" style="width: 20%;"></div>
         </div>
 
         <div style="display: flex; gap: 8px; align-items: center;">
@@ -363,29 +396,32 @@ export class UIManager {
   }
 
   public updateHUD(state: GameState, pingMs?: number): void {
-    // Dominance calculation
-    let p1Total = 0;
-    let p2Total = 0;
+    const factions: PlanetOwner[] = ['player1', 'player2', 'player3', 'player4', 'player5'];
+    const counts: Record<PlanetOwner, number> = {
+      player1: 0,
+      player2: 0,
+      player3: 0,
+      player4: 0,
+      player5: 0,
+      neutral: 0,
+    };
 
     for (const p of state.planets) {
-      if (p.owner === 'player1') p1Total += p.units;
-      if (p.owner === 'player2') p2Total += p.units;
+      counts[p.owner] += p.units;
     }
     for (const f of state.fleets) {
-      if (f.owner === 'player1') p1Total += f.units;
-      if (f.owner === 'player2') p2Total += f.units;
+      counts[f.owner] += f.units;
     }
 
-    const total = p1Total + p2Total;
-    const p1Pct = total > 0 ? (p1Total / total) * 100 : 50;
-    const p2Pct = 100 - p1Pct;
+    const total = factions.reduce((acc, f) => acc + counts[f], 0);
 
-    const domP1 = document.getElementById('dom-p1');
-    const domP2 = document.getElementById('dom-p2');
-    if (domP1 && domP2) {
-      domP1.style.width = `${p1Pct.toFixed(1)}%`;
-      domP2.style.width = `${p2Pct.toFixed(1)}%`;
-    }
+    factions.forEach((f, idx) => {
+      const segEl = document.getElementById(`dom-p${idx + 1}`);
+      if (segEl) {
+        const pct = total > 0 ? (counts[f] / total) * 100 : 0;
+        segEl.style.width = `${pct.toFixed(1)}%`;
+      }
+    });
 
     if (pingMs !== undefined) {
       const pingBadge = document.getElementById('hud-ping-badge');
@@ -407,14 +443,24 @@ export class UIManager {
       return `${m}m ${s < 10 ? '0' : ''}${s}s`;
     };
 
+    const factionNames: Record<PlanetOwner, string> = {
+      player1: 'CYAN (PLAYER 1)',
+      player2: 'MAGENTA (BOT 1)',
+      player3: 'GOLD (BOT 2)',
+      player4: 'EMERALD (BOT 3)',
+      player5: 'PURPLE (BOT 4)',
+      neutral: 'NEUTRAL',
+    };
+    const winnerName = factionNames[winner] || winner.toUpperCase();
+
     const modal = document.createElement('div');
     modal.className = 'glass-panel screen-modal';
     modal.innerHTML = `
       <div class="result-header ${isVictory ? 'result-victory' : 'result-defeat'}">
-        ${isVictory ? '🏆 KEMENANGAN TOTAL!' : '💥 ARMADA HANCUR!'}
+        ${isVictory ? '🏆 KEMENANGAN TOTAL!' : `💥 GALAKSI DIKUASAI ${winnerName}!`}
       </div>
       <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 18px;">
-        ${isVictory ? 'Anda berhasil menguasai seluruh tata surya.' : 'Musuh telah menaklukkan seluruh planet Anda.'}
+        ${isVictory ? 'Anda berhasil menaklukkan seluruh faksi galaksi.' : `Armada Anda telah ditaklukkan oleh faksi ${winnerName}.`}
       </p>
 
       <div class="stats-grid">

@@ -121,4 +121,31 @@ describe('GameEngine', () => {
     expect(engine.getState().winner).toBe('player1');
     expect(engine.getState().status).toBe('ended');
   });
+
+  it('handles multi-faction FFA elimination and declares last survivor winner', () => {
+    const planets: Planet[] = [
+      { id: 'p1', x: 100, y: 100, radius: 30, owner: 'player1', units: 20, maxUnits: 100, productionRate: 1, productionTimer: 0, pulsePhase: 0 },
+      { id: 'p2', x: 200, y: 100, radius: 30, owner: 'player2', units: 20, maxUnits: 100, productionRate: 1, productionTimer: 0, pulsePhase: 0 },
+      { id: 'p3', x: 300, y: 100, radius: 30, owner: 'player3', units: 20, maxUnits: 100, productionRate: 1, productionTimer: 0, pulsePhase: 0 },
+    ];
+    const engine = new GameEngine(planets);
+    engine.start();
+
+    // With 3 active factions, game continues
+    engine.update(0.1);
+    expect(engine.getState().status).toBe('running');
+    expect(engine.getState().winner).toBeNull();
+
+    // Player 2 eliminated (conquered by player1)
+    planets[1].owner = 'player1';
+    engine.update(0.1);
+    expect(engine.getState().status).toBe('running');
+    expect(engine.getState().winner).toBeNull();
+
+    // Player 3 eliminated -> Player 1 wins
+    planets[2].owner = 'player1';
+    engine.update(0.1);
+    expect(engine.getState().status).toBe('ended');
+    expect(engine.getState().winner).toBe('player1');
+  });
 });

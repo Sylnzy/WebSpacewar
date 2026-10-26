@@ -57,4 +57,16 @@ describe('MapGenerator', () => {
       expect(p.y + p.radius).toBeLessThanOrEqual(height - 20);
     }
   });
+
+  it('generates symmetric balanced home planets for 3, 4, and 5 players', () => {
+    [3, 4, 5].forEach((count) => {
+      const planets = generateMap(900, 700, 15, 1000 + count, count);
+      for (let i = 1; i <= count; i++) {
+        const ownerPlanets = planets.filter((p) => p.owner === `player${i}`);
+        expect(ownerPlanets.length).toBe(1);
+        expect(ownerPlanets[0].units).toBe(50);
+        expect(ownerPlanets[0].productionRate).toBe(2.5);
+      }
+    });
+  });
 });

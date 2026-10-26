@@ -109,4 +109,32 @@ describe('BotAI', () => {
     const action = ai.update(2.0, state);
     expect(action).toBeNull();
   });
+
+  it('correctly tracks owner and targets other factions in multi-bot setup', () => {
+    const bot2 = new BotAI('player2', 'medium');
+    const bot3 = new BotAI('player3', 'medium');
+
+    expect(bot2.getOwner()).toBe('player2');
+    expect(bot3.getOwner()).toBe('player3');
+
+    const state = createMockState();
+    state.planets.push({
+      id: 'p3-home',
+      x: 300,
+      y: 300,
+      radius: 30,
+      owner: 'player3',
+      units: 25,
+      maxUnits: 100,
+      productionRate: 2,
+      productionTimer: 0,
+      pulsePhase: 0,
+    });
+
+    const action = bot3.update(2.0, state);
+    expect(action).not.toBeNull();
+    expect(action?.fromPlanetIds).toContain('p3-home');
+    const targetPlanet = state.planets.find((p) => p.id === action?.toPlanetId)!;
+    expect(targetPlanet.owner).not.toBe('player3');
+  });
 });

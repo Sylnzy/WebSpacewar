@@ -198,23 +198,21 @@ export class GameEngine {
   private checkWinner(): void {
     if (this.state.status !== 'running') return;
 
-    const p1Planets = this.state.planets.filter((p) => p.owner === 'player1').length;
-    const p1Fleets = this.state.fleets.filter((f) => f.owner === 'player1').length;
+    const allFactions: PlanetOwner[] = ['player1', 'player2', 'player3', 'player4', 'player5'];
+    const activeFactions = allFactions.filter((owner) => {
+      const hasPlanets = this.state.planets.some((p) => p.owner === owner);
+      const hasFleets = this.state.fleets.some((f) => f.owner === owner);
+      return hasPlanets || hasFleets;
+    });
 
-    const p2Planets = this.state.planets.filter((p) => p.owner === 'player2').length;
-    const p2Fleets = this.state.fleets.filter((f) => f.owner === 'player2').length;
-
-    const p1Active = p1Planets > 0 || p1Fleets > 0;
-    const p2Active = p2Planets > 0 || p2Fleets > 0;
-
-    if (!p1Active && p2Active) {
-      this.state.winner = 'player2';
+    if (activeFactions.length === 1) {
+      const winner = activeFactions[0];
+      this.state.winner = winner;
       this.state.status = 'ended';
-      this.onGameOver?.('player2');
-    } else if (!p2Active && p1Active) {
-      this.state.winner = 'player1';
+      this.onGameOver?.(winner);
+    } else if (activeFactions.length === 0) {
+      this.state.winner = null;
       this.state.status = 'ended';
-      this.onGameOver?.('player1');
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Planet } from './Types';
+import { Planet, PlanetOwner } from './Types';
 
 /**
  * Seedable pseudo-random number generator (Mulberry32).
@@ -33,8 +33,11 @@ export function generateMap(
   width: number,
   height: number,
   planetCount: number = 10,
-  seed: number = Date.now()
+  seed: number = Date.now(),
+  playerCount: number = 2
 ): Planet[] {
+  const clampedPlayerCount = Math.min(5, Math.max(2, playerCount));
+  const effectivePlanetCount = Math.max(planetCount, clampedPlayerCount + 4);
   const rng = new PRNG(seed);
   const planets: Planet[] = [];
   const padding = 55;
@@ -43,46 +46,33 @@ export function generateMap(
   const centerX = width / 2;
   const centerY = height / 2;
 
-  // 1. Place Home Planets symmetrically across center
+  // 1. Place Home Planets radially across center
   const homeRadius = 35;
   const homeUnits = 50;
   const homeProduction = 2.5;
   const homeOffsetDist = Math.min(width, height) * 0.35;
-  const homeAngle = rng.range(0, Math.PI); // random axis
+  const baseAngle = rng.range(0, Math.PI * 2);
 
-  const p1X = centerX - Math.cos(homeAngle) * homeOffsetDist;
-  const p1Y = centerY - Math.sin(homeAngle) * homeOffsetDist;
+  const playerOwners: PlanetOwner[] = ['player1', 'player2', 'player3', 'player4', 'player5'];
 
-  const p2X = centerX + Math.cos(homeAngle) * homeOffsetDist;
-  const p2Y = centerY + Math.sin(homeAngle) * homeOffsetDist;
+  for (let i = 0; i < clampedPlayerCount; i++) {
+    const angle = baseAngle + (i * 2 * Math.PI) / clampedPlayerCount;
+    const px = centerX + Math.cos(angle) * homeOffsetDist;
+    const py = centerY + Math.sin(angle) * homeOffsetDist;
 
-  const player1Home: Planet = {
-    id: 'p-home-1',
-    x: Math.round(p1X),
-    y: Math.round(p1Y),
-    radius: homeRadius,
-    owner: 'player1',
-    units: homeUnits,
-    maxUnits: 150,
-    productionRate: homeProduction,
-    productionTimer: 0,
-    pulsePhase: 0,
-  };
-
-  const player2Home: Planet = {
-    id: 'p-home-2',
-    x: Math.round(p2X),
-    y: Math.round(p2Y),
-    radius: homeRadius,
-    owner: 'player2',
-    units: homeUnits,
-    maxUnits: 150,
-    productionRate: homeProduction,
-    productionTimer: 0,
-    pulsePhase: Math.PI,
-  };
-
-  planets.push(player1Home, player2Home);
+    planets.push({
+      id: `p-home-${i + 1}`,
+      x: Math.round(px),
+      y: Math.round(py),
+      radius: homeRadius,
+      owner: playerOwners[i],
+      units: homeUnits,
+      maxUnits: 150,
+      productionRate: homeProduction,
+      productionTimer: 0,
+      pulsePhase: (i * Math.PI * 2) / clampedPlayerCount,
+    });
+  }
 
   // Helper collision check
   const doesOverlap = (x: number, y: number, radius: number): boolean => {
@@ -106,7 +96,7 @@ export function generateMap(
   };
 
   // 2. Place Neutral Planets
-  const neutralsNeeded = Math.max(0, planetCount - 2);
+  const neutralsNeeded = Math.max(0, effectivePlanetCount - clampedPlayerCount);
   let neutralIdx = 0;
 
   for (let i = 0; i < neutralsNeeded; i++) {
