@@ -50,6 +50,8 @@ class GameApp {
     this.network = new NetworkManager({
       onConnected: () => this.handleNetworkConnected(),
       onDisconnected: (reason) => this.handleNetworkDisconnected(reason),
+      onPlayerJoined: (role, peerId) => this.handlePlayerJoined(role, peerId),
+      onPlayerLeft: (role, peerId) => this.handlePlayerLeft(role, peerId),
       onMessage: (msg) => this.handleNetworkMessage(msg),
       onError: (err) => console.error('Network error:', err),
     });
@@ -58,6 +60,7 @@ class GameApp {
       onStartSolo: (diff, count) => this.startSoloGame(diff, count),
       onHostGame: () => this.startHostLobby(),
       onJoinGame: (code) => this.joinLobby(code),
+      onStartMultiplayer: () => this.startHostMultiplayerGame(),
       onRatioSelect: (ratio) => {
         this.engine.setSendRatio(ratio);
       },
@@ -180,7 +183,7 @@ class GameApp {
 
     try {
       const roomCode = await this.network.createRoom();
-      this.ui.showLobbyHost(roomCode);
+      this.ui.showLobbyHost(roomCode, this.network.getPlayers());
     } catch (e) {
       alert(`Gagal membuat room P2P: ${e}`);
       this.returnToMenu();
@@ -193,7 +196,7 @@ class GameApp {
     this.playerRole = 'player2';
     this.input.setPlayerOwner('player2');
     this.resetStats();
-    this.ui.showLobbyGuest();
+    this.ui.showLobbyGuest(this.playerRole, []);
 
     try {
       await this.network.joinRoom(code);
@@ -203,45 +206,89 @@ class GameApp {
     }
   }
 
+  private handlePlayerJoined(_role: PlanetOwner, _peerId: string): void {
+    if (this.mode === 'multiplayer-host') {
+      this.ui.updateLobbyPlayers(this.network.getPlayers(), true);
+    }
+  }
+
+  private handlePlayerLeft(role: PlanetOwner, _peerId: string): void {
+    if (this.mode === 'multiplayer-host') {
+      this.ui.updateLobbyPlayers(this.network.getPlayers(), true);
+
+      // If game is in progress, replace left player with bot
+      if (this.engine.getState().status === 'running') {
+        this.bots.push(new BotAI(role, 'medium'));
+      }
+    }
+  }
+
+  private startHostMultiplayerGame(): void {
+    const players = this.network.getPlayers();
+    if (players.length < 2) return;
+
+    const playerCount = players.length;
+    this.currentPlayerCount = playerCount;
+
+    const width = this.renderer.getWidth();
+    const height = this.renderer.getHeight();
+    const seed = Date.now();
+    const totalPlanets = 10 + (playerCount - 2) * 3;
+    const planets = generateMap(width, height, totalPlanets, seed, playerCount);
+
+    this.engine = new GameEngine(planets);
+    this.setupEngineHooks();
+    this.engine.start();
+
+    this.network.broadcast({
+      type: 'GAME_START',
+      seed,
+      planets,
+      playerCount,
+    });
+
+    this.ui.showHUD(true, 'player1');
+  }
+
   private handleNetworkConnected(): void {
     if (this.mode === 'multiplayer-host') {
-      // Host generates initial map and launches game
-      const width = this.renderer.getWidth();
-      const height = this.renderer.getHeight();
-      const seed = Date.now();
-      const planets = generateMap(width, height, 11, seed);
-
-      this.engine = new GameEngine(planets);
-      this.setupEngineHooks();
-      this.engine.start();
-
-      this.network.send({
-        type: 'GAME_START',
-        seed,
-        planets,
-      });
-
-      this.ui.showHUD(true, 'player1');
+      this.ui.updateLobbyPlayers(this.network.getPlayers(), true);
     }
   }
 
   private handleNetworkMessage(msg: unknown): void {
     const netMsg = msg as { type: string; [key: string]: unknown };
 
-    if (netMsg.type === 'GAME_START') {
+    if (netMsg.type === 'LOBBY_ASSIGN_ROLE') {
+      const role = netMsg.role as PlanetOwner;
+      this.playerRole = role;
+      this.input.setPlayerOwner(role);
+      const badge = document.getElementById('guest-role-badge');
+      if (badge) {
+        badge.textContent = `Terhubung sebagai: ${this.ui.getFactionLabel(role)}`;
+      }
+    } else if (netMsg.type === 'LOBBY_UPDATE') {
+      const players = netMsg.players as { role: PlanetOwner; name: string }[];
+      if (this.mode === 'multiplayer-guest') {
+        this.ui.updateLobbyPlayers(players, false);
+      }
+    } else if (netMsg.type === 'GAME_START') {
       const planets = netMsg.planets as GameState['planets'];
+      const playerCount = (netMsg.playerCount as number) || 2;
+      this.currentPlayerCount = playerCount;
       this.engine = new GameEngine(planets);
       this.setupEngineHooks();
       this.engine.start();
-      this.ui.showHUD(true, 'player2');
+      this.ui.showHUD(true, this.playerRole);
     } else if (netMsg.type === 'COMMAND_DISPATCH') {
-      // Host receives guest command
+      // Host receives guest command with owner
       if (this.mode === 'multiplayer-host') {
         const fromPlanetIds = netMsg.fromPlanetIds as string[];
         const toPlanetId = netMsg.toPlanetId as string;
         const ratio = netMsg.ratio as number;
+        const owner = (netMsg.owner as PlanetOwner) || 'player2';
 
-        this.engine.dispatchFleet(fromPlanetIds, toPlanetId, ratio, 'player2');
+        this.engine.dispatchFleet(fromPlanetIds, toPlanetId, ratio, owner);
         soundManager.playDispatch();
       }
     } else if (netMsg.type === 'STATE_SNAPSHOT') {
@@ -252,19 +299,18 @@ class GameApp {
       }
     } else if (netMsg.type === 'PLAYER_SURRENDER') {
       const surrenderingPlayer = netMsg.owner as PlanetOwner;
-      const winner = surrenderingPlayer === 'player1' ? 'player2' : 'player1';
-      this.engine.getState().winner = winner;
-      this.engine.getState().status = 'ended';
-      this.engine.onGameOver?.(winner);
+      if (this.mode === 'multiplayer-host') {
+        this.bots.push(new BotAI(surrenderingPlayer, 'medium'));
+      }
     }
   }
 
   private handleNetworkDisconnected(reason?: string): void {
-    if (this.mode === 'multiplayer-host' || this.mode === 'multiplayer-guest') {
-      alert(`Koneksi terputus: ${reason || 'Lawan keluar'}. Mengalihkan pertandingan ke Bot AI.`);
-      this.mode = 'solo';
-      this.bots = [new BotAI(this.playerRole === 'player1' ? 'player2' : 'player1', 'medium')];
-      this.ui.showHUD(false, this.playerRole);
+    if (this.mode === 'multiplayer-host') {
+      // One player disconnected: handled by handlePlayerLeft
+    } else if (this.mode === 'multiplayer-guest') {
+      alert(`Koneksi terputus dari Host: ${reason || 'Host keluar'}.`);
+      this.returnToMenu();
     }
   }
 
@@ -283,13 +329,14 @@ class GameApp {
         this.stats.deployed++;
       }
     } else if (this.mode === 'multiplayer-guest') {
-      // Guest sends command to Host
+      // Guest sends command to Host with its assigned role
       this.network.send({
         type: 'COMMAND_DISPATCH',
         fromPlanetIds,
         toPlanetId,
         ratio,
         timestamp: Date.now(),
+        owner: this.playerRole,
       });
       soundManager.playDispatch();
       this.stats.deployed++;

@@ -1,5 +1,5 @@
 import { Peer, DataConnection } from 'peerjs';
-import { NetworkMessage } from '../core/Types';
+import { NetworkMessage, PlanetOwner } from '../core/Types';
 import {
   generateRoomCode,
   serializeMessage,
@@ -9,17 +9,26 @@ import {
 
 export type Role = 'host' | 'guest';
 
+export interface ConnectedPlayer {
+  conn: DataConnection;
+  role: PlanetOwner;
+  name: string;
+}
+
 export interface NetworkCallbacks {
   onConnected?: (peerId: string) => void;
   onDisconnected?: (reason?: string) => void;
-  onMessage?: (msg: NetworkMessage) => void;
+  onMessage?: (msg: NetworkMessage, fromPeerId?: string) => void;
   onPingUpdate?: (pingMs: number) => void;
   onError?: (err: Error) => void;
+  onPlayerJoined?: (role: PlanetOwner, peerId: string) => void;
+  onPlayerLeft?: (role: PlanetOwner, peerId: string) => void;
 }
 
 export class NetworkManager {
   private peer: Peer | null = null;
-  private connection: DataConnection | null = null;
+  private guestConnection: DataConnection | null = null;
+  private connections: Map<string, ConnectedPlayer> = new Map();
   private role: Role = 'host';
   private callbacks: NetworkCallbacks = {};
   private currentPing: number = 0;
@@ -42,7 +51,24 @@ export class NetworkManager {
   }
 
   public isConnected(): boolean {
-    return this.connection !== null && this.connection.open;
+    if (this.role === 'host') {
+      return this.connections.size > 0;
+    }
+    return this.guestConnection !== null && this.guestConnection.open;
+  }
+
+  public getConnectedCount(): number {
+    return this.role === 'host' ? this.connections.size : (this.guestConnection?.open ? 1 : 0);
+  }
+
+  public getPlayers(): { role: PlanetOwner; name: string }[] {
+    const list: { role: PlanetOwner; name: string }[] = [
+      { role: 'player1', name: 'Komandan (Host)' },
+    ];
+    for (const p of this.connections.values()) {
+      list.push({ role: p.role, name: p.name });
+    }
+    return list;
   }
 
   /**
@@ -67,7 +93,7 @@ export class NetworkManager {
         });
 
         this.peer.on('connection', (conn) => {
-          this.handleIncomingConnection(conn);
+          this.handleIncomingHostConnection(conn);
         });
 
         this.peer.on('error', (err) => {
@@ -100,7 +126,7 @@ export class NetworkManager {
           const conn = this.peer.connect(targetPeerId, {
             reliable: true,
           });
-          this.setupConnection(conn);
+          this.setupGuestConnection(conn);
 
           conn.on('open', () => {
             resolve();
@@ -121,17 +147,80 @@ export class NetworkManager {
     });
   }
 
-  private handleIncomingConnection(conn: DataConnection): void {
-    if (this.connection && this.connection.open) {
-      // Room already full for 2-player match
+  private handleIncomingHostConnection(conn: DataConnection): void {
+    // Max 4 guests (5 players total)
+    if (this.connections.size >= 4) {
       conn.close();
       return;
     }
-    this.setupConnection(conn);
+
+    const availableRoles: PlanetOwner[] = ['player2', 'player3', 'player4', 'player5'];
+    const usedRoles = new Set(Array.from(this.connections.values()).map((p) => p.role));
+    const nextRole = availableRoles.find((r) => !usedRoles.has(r)) || 'player2';
+
+    const playerRoleNumber = nextRole.replace('player', '');
+    const playerEntry: ConnectedPlayer = {
+      conn,
+      role: nextRole,
+      name: `Player ${playerRoleNumber}`,
+    };
+
+    conn.on('open', () => {
+      this.connections.set(conn.peer, playerEntry);
+      this.callbacks.onConnected?.(conn.peer);
+      this.callbacks.onPlayerJoined?.(nextRole, conn.peer);
+
+      // Assign assigned role to this guest
+      this.sendToConn(conn, {
+        type: 'LOBBY_ASSIGN_ROLE',
+        role: nextRole,
+      });
+
+      // Broadcast full player list to all connected players
+      this.broadcast({
+        type: 'LOBBY_UPDATE',
+        players: this.getPlayers(),
+      });
+    });
+
+    conn.on('data', (raw: unknown) => {
+      const msg = deserializeMessage(raw);
+      if (!msg) return;
+
+      if (msg.type === 'PEER_PING') {
+        this.sendToConn(conn, {
+          type: 'PEER_PONG',
+          clientTime: msg.clientTime,
+          serverTime: Date.now(),
+        });
+        return;
+      }
+
+      this.callbacks.onMessage?.(msg, conn.peer);
+    });
+
+    conn.on('close', () => {
+      const leaving = this.connections.get(conn.peer);
+      if (leaving) {
+        this.connections.delete(conn.peer);
+        this.callbacks.onPlayerLeft?.(leaving.role, conn.peer);
+        this.broadcast({
+          type: 'LOBBY_UPDATE',
+          players: this.getPlayers(),
+        });
+      }
+      if (this.connections.size === 0) {
+        this.callbacks.onDisconnected?.('Semua pemain telah keluar');
+      }
+    });
+
+    conn.on('error', (err) => {
+      this.callbacks.onError?.(new Error(`Connection error with ${conn.peer}: ${err}`));
+    });
   }
 
-  private setupConnection(conn: DataConnection): void {
-    this.connection = conn;
+  private setupGuestConnection(conn: DataConnection): void {
+    this.guestConnection = conn;
 
     conn.on('open', () => {
       this.callbacks.onConnected?.(conn.peer);
@@ -142,28 +231,19 @@ export class NetworkManager {
       const msg = deserializeMessage(raw);
       if (!msg) return;
 
-      if (msg.type === 'PEER_PING') {
-        this.send({
-          type: 'PEER_PONG',
-          clientTime: msg.clientTime,
-          serverTime: Date.now(),
-        });
-        return;
-      }
-
       if (msg.type === 'PEER_PONG') {
         this.currentPing = calculatePing(msg.clientTime, Date.now());
         this.callbacks.onPingUpdate?.(this.currentPing);
         return;
       }
 
-      this.callbacks.onMessage?.(msg);
+      this.callbacks.onMessage?.(msg, conn.peer);
     });
 
     conn.on('close', () => {
       this.stopPingLoop();
-      this.connection = null;
-      this.callbacks.onDisconnected?.('Peer closed connection');
+      this.guestConnection = null;
+      this.callbacks.onDisconnected?.('Host menutup koneksi room');
     });
 
     conn.on('error', (err) => {
@@ -171,18 +251,43 @@ export class NetworkManager {
     });
   }
 
-  public send(msg: NetworkMessage): boolean {
-    if (!this.connection || !this.connection.open) {
-      return false;
-    }
-
+  private sendToConn(conn: DataConnection, msg: NetworkMessage): boolean {
+    if (!conn || !conn.open) return false;
     try {
-      this.connection.send(serializeMessage(msg));
+      conn.send(serializeMessage(msg));
       return true;
-    } catch (e) {
-      console.warn('Failed to send network message:', e);
+    } catch {
       return false;
     }
+  }
+
+  /**
+   * Broadcasts message to all connected peers if host, or sends to host if guest.
+   */
+  public broadcast(msg: NetworkMessage): void {
+    if (this.role === 'host') {
+      const serialized = serializeMessage(msg);
+      for (const p of this.connections.values()) {
+        if (p.conn.open) {
+          try {
+            p.conn.send(serialized);
+          } catch (e) {
+            console.warn('Failed broadcast to peer:', e);
+          }
+        }
+      }
+    } else if (this.guestConnection && this.guestConnection.open) {
+      try {
+        this.guestConnection.send(serializeMessage(msg));
+      } catch (e) {
+        console.warn('Failed send to host:', e);
+      }
+    }
+  }
+
+  public send(msg: NetworkMessage): boolean {
+    this.broadcast(msg);
+    return true;
   }
 
   private startPingLoop(): void {
@@ -207,10 +312,15 @@ export class NetworkManager {
   public disconnect(): void {
     this.stopPingLoop();
 
-    if (this.connection) {
-      this.connection.close();
-      this.connection = null;
+    if (this.guestConnection) {
+      this.guestConnection.close();
+      this.guestConnection = null;
     }
+
+    for (const p of this.connections.values()) {
+      p.conn.close();
+    }
+    this.connections.clear();
 
     if (this.peer) {
       this.peer.destroy();

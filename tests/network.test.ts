@@ -47,4 +47,22 @@ describe('NetworkProtocol', () => {
 
     expect(ping).toBe(80);
   });
+
+  it('serializes and deserializes multi-client lobby messages', () => {
+    const assignMsg: NetworkMessage = {
+      type: 'LOBBY_ASSIGN_ROLE',
+      role: 'player3',
+    };
+    const updateMsg: NetworkMessage = {
+      type: 'LOBBY_UPDATE',
+      players: [
+        { role: 'player1', name: 'Komandan (Host)' },
+        { role: 'player2', name: 'Player 2' },
+        { role: 'player3', name: 'Player 3' },
+      ],
+    };
+
+    expect(deserializeMessage(serializeMessage(assignMsg))).toEqual(assignMsg);
+    expect(deserializeMessage(serializeMessage(updateMsg))).toEqual(updateMsg);
+  });
 });

@@ -50,8 +50,10 @@ export interface CombatResult {
 
 export type NetworkMessage =
   | { type: 'LOBBY_READY'; role: 'host' | 'guest'; name: string }
-  | { type: 'GAME_START'; seed: number; planets: Planet[] }
-  | { type: 'COMMAND_DISPATCH'; fromPlanetIds: string[]; toPlanetId: string; ratio: number; timestamp: number }
+  | { type: 'LOBBY_ASSIGN_ROLE'; role: PlanetOwner }
+  | { type: 'LOBBY_UPDATE'; players: { role: PlanetOwner; name: string }[] }
+  | { type: 'GAME_START'; seed: number; planets: Planet[]; playerCount: number }
+  | { type: 'COMMAND_DISPATCH'; fromPlanetIds: string[]; toPlanetId: string; ratio: number; timestamp: number; owner?: PlanetOwner }
   | { type: 'STATE_SNAPSHOT'; state: GameState; timestamp: number }
   | { type: 'PEER_PING'; clientTime: number }
   | { type: 'PEER_PONG'; clientTime: number; serverTime: number }

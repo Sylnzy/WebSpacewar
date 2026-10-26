@@ -2,6 +2,8 @@ import { NetworkMessage } from '../core/Types';
 
 const VALID_TYPES = new Set([
   'LOBBY_READY',
+  'LOBBY_ASSIGN_ROLE',
+  'LOBBY_UPDATE',
   'GAME_START',
   'COMMAND_DISPATCH',
   'STATE_SNAPSHOT',

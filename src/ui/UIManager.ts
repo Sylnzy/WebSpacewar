@@ -5,6 +5,7 @@ export interface UICallbacks {
   onStartSolo: (diff: AIDifficulty, playerCount: number) => void;
   onHostGame: () => void;
   onJoinGame: (code: string) => void;
+  onStartMultiplayer?: () => void;
   onRatioSelect: (ratio: number) => void;
   onSelectAll: () => void;
   onToggleMute: () => boolean;
@@ -264,29 +265,74 @@ export class UIManager {
     });
   }
 
-  public showLobbyHost(roomCode: string): void {
+  public getFactionLabel(role: PlanetOwner): string {
+    switch (role) {
+      case 'player1': return '🔷 CYAN (PLAYER 1)';
+      case 'player2': return '🔴 MAGENTA (PLAYER 2)';
+      case 'player3': return '🟡 GOLD (PLAYER 3)';
+      case 'player4': return '🟢 EMERALD (PLAYER 4)';
+      case 'player5': return '🟣 PURPLE (PLAYER 5)';
+      default: return '⚪ NETRAL';
+    }
+  }
+
+  public updateLobbyPlayers(players: { role: PlanetOwner; name: string }[], isHost: boolean = true): void {
+    const slotsEl = document.getElementById('lobby-slots');
+    if (!slotsEl) return;
+
+    const allRoles: PlanetOwner[] = ['player1', 'player2', 'player3', 'player4', 'player5'];
+    slotsEl.innerHTML = allRoles.map((role, idx) => {
+      const active = players.find((p) => p.role === role);
+      const isSlotActive = !!active;
+      return `
+        <div class="lobby-player-row ${isSlotActive ? 'row-active' : 'row-empty'}">
+          <div class="slot-dot dot-${role}"></div>
+          <div class="slot-name">${isSlotActive ? active.name : `Slot ${idx + 1} (Menunggu...)`}</div>
+          <div class="slot-badge">${isSlotActive ? (role === 'player1' ? 'HOST' : 'TERHUBUNG') : 'KOSONG'}</div>
+        </div>
+      `;
+    }).join('');
+
+    if (isHost) {
+      const startBtn = document.getElementById('btn-start-multiplayer') as HTMLButtonElement | null;
+      if (startBtn) {
+        if (players.length >= 2) {
+          startBtn.removeAttribute('disabled');
+          startBtn.textContent = `Mulai Pertandingan (${players.length} Pemain)`;
+        } else {
+          startBtn.setAttribute('disabled', 'true');
+          startBtn.textContent = 'Menunggu Pemain Lain... (1/5)';
+        }
+      }
+    }
+  }
+
+  public showLobbyHost(roomCode: string, players: { role: PlanetOwner; name: string }[] = [{ role: 'player1', name: 'Komandan (Host)' }]): void {
     this.clearMenuCleanup();
     this.container.innerHTML = `
-      <div class="glass-panel screen-modal">
+      <div class="glass-panel screen-modal lobby-modal">
         <h2 class="game-title" style="font-size: 26px;">ROOM MULTIPLAYER</h2>
-        <p class="game-subtitle">Bagikan kode berikut ke lawan Anda</p>
+        <p class="game-subtitle">Bagikan kode berikut untuk mengundang hingga 4 kawan</p>
 
         <div class="code-pill" id="copy-code-btn" title="Klik untuk menyalin">
           <span>${roomCode}</span>
           <span style="font-size: 13px; opacity: 0.8;">📋 Salin</span>
         </div>
 
-        <p id="copy-feedback" style="font-size: 12px; color: var(--cyan); height: 16px; margin-bottom: 16px;"></p>
+        <p id="copy-feedback" style="font-size: 12px; color: var(--cyan); height: 16px; margin-bottom: 8px;"></p>
 
-        <div class="hud-badge" style="display: inline-block; margin-bottom: 20px;">
-          ⏳ Menunggu Pemain 2 Terhubung...
-        </div>
+        <div class="lobby-slots" id="lobby-slots"></div>
 
-        <div>
+        <div class="lobby-actions" style="margin-top: 18px; display: flex; gap: 10px;">
+          <button class="btn btn-cyan btn-glow" id="btn-start-multiplayer" style="flex: 1;" ${players.length < 2 ? 'disabled' : ''}>
+            ${players.length >= 2 ? `Mulai Pertandingan (${players.length} Pemain)` : 'Menunggu Pemain Lain... (1/5)'}
+          </button>
           <button class="btn" id="btn-cancel-lobby">Batal</button>
         </div>
       </div>
     `;
+
+    this.updateLobbyPlayers(players, true);
 
     document.getElementById('copy-code-btn')?.addEventListener('click', () => {
       navigator.clipboard.writeText(roomCode);
@@ -294,25 +340,38 @@ export class UIManager {
       if (feedback) feedback.textContent = 'Kode disalin ke clipboard!';
     });
 
+    document.getElementById('btn-start-multiplayer')?.addEventListener('click', () => {
+      this.callbacks.onStartMultiplayer?.();
+    });
+
     document.getElementById('btn-cancel-lobby')?.addEventListener('click', () => {
       this.callbacks.onBackToMenu();
     });
   }
 
-  public showLobbyGuest(): void {
+  public showLobbyGuest(role: PlanetOwner = 'player2', players: { role: PlanetOwner; name: string }[] = []): void {
     this.clearMenuCleanup();
     this.container.innerHTML = `
-      <div class="glass-panel screen-modal">
-        <h2 class="game-title" style="font-size: 26px;">MENGHUBUNGKAN...</h2>
-        <p class="game-subtitle">Menghubungkan ke WebRTC Host...</p>
-        <div class="hud-badge" style="display: inline-block; margin: 16px 0;">
-          🔄 Mengirim Handshake P2P...
+      <div class="glass-panel screen-modal lobby-modal">
+        <h2 class="game-title" style="font-size: 26px;">ROOM MULTIPLAYER</h2>
+        <p class="game-subtitle">Terhubung ke room pertempuran</p>
+
+        <div class="hud-badge" id="guest-role-badge" style="display: inline-block; margin-bottom: 14px;">
+          ${this.getFactionLabel(role)}
         </div>
-        <div>
+
+        <div class="lobby-slots" id="lobby-slots"></div>
+
+        <div style="margin-top: 18px;">
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+            ⏳ Menunggu Host memulai pertandingan...
+          </p>
           <button class="btn" id="btn-cancel-guest">Batal</button>
         </div>
       </div>
     `;
+
+    this.updateLobbyPlayers(players, false);
 
     document.getElementById('btn-cancel-guest')?.addEventListener('click', () => {
       this.callbacks.onBackToMenu();
@@ -324,7 +383,7 @@ export class UIManager {
     this.container.innerHTML = `
       <div id="hud-top">
         <div class="hud-badge" id="hud-player-badge">
-          ${playerRole === 'player1' ? '🔷 ANDA: CYAN' : '🔴 ANDA: MAGENTA'}
+          ${this.getFactionLabel(playerRole)}
         </div>
 
         <div class="dominance-container" id="dominance-container" title="Dominasi Galaksi">
