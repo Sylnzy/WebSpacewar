@@ -18,40 +18,186 @@ export class UIManager {
   private callbacks: UICallbacks;
   private currentRatio: number = 0.5;
   private selectedDifficulty: AIDifficulty = 'medium';
+  private menuCleanup: (() => void) | null = null;
 
   constructor(container: HTMLElement, callbacks: UICallbacks) {
     this.container = container;
     this.callbacks = callbacks;
   }
 
+  private clearMenuCleanup(): void {
+    if (this.menuCleanup) {
+      this.menuCleanup();
+      this.menuCleanup = null;
+    }
+  }
+
   public showMainMenu(): void {
+    this.clearMenuCleanup();
+
     this.container.innerHTML = `
-      <div class="glass-panel screen-modal">
-        <h1 class="game-title">SPACE CONQUEST</h1>
-        <p class="game-subtitle">Taktik Galaksi Real-Time RTS</p>
+      <div class="main-menu-container">
+        <div class="main-menu-wrapper">
+          <!-- Character Column: Floating Cyber Cosmonaut -->
+          <div class="astronaut-hero-card" id="astronaut-hero">
+            <div class="astronaut-character-wrap">
+              <div class="cosmic-orbit-ring"></div>
+              <div class="astronaut-float-box" id="astronaut-float-box">
+                <svg class="astronaut-svg" viewBox="0 0 240 280" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="visorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#ffd000" />
+                      <stop offset="45%" stop-color="#ff7700" />
+                      <stop offset="70%" stop-color="#00f0ff" />
+                      <stop offset="100%" stop-color="#0b1b3d" />
+                    </linearGradient>
+                    <linearGradient id="suitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#f8fafc" />
+                      <stop offset="60%" stop-color="#cbd5e1" />
+                      <stop offset="100%" stop-color="#64748b" />
+                    </linearGradient>
+                    <linearGradient id="suitDark" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#334155" />
+                      <stop offset="100%" stop-color="#0f172a" />
+                    </linearGradient>
+                    <radialGradient id="thrusterGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stop-color="#00f0ff" stop-opacity="1" />
+                      <stop offset="60%" stop-color="#00f0ff" stop-opacity="0.4" />
+                      <stop offset="100%" stop-color="#00f0ff" stop-opacity="0" />
+                    </radialGradient>
+                    <radialGradient id="helmetGlare" cx="35%" cy="30%" r="50%">
+                      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8" />
+                      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.1" />
+                      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                    </radialGradient>
+                    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
 
-        <!-- Mode Solo vs AI -->
-        <div class="menu-section">
-          <div class="section-title">Mode Solo vs AI</div>
-          <div class="btn-group" style="margin-bottom: 12px;">
-            <button class="btn ${this.selectedDifficulty === 'easy' ? 'active' : ''}" id="btn-diff-easy">Easy</button>
-            <button class="btn ${this.selectedDifficulty === 'medium' ? 'active' : ''}" id="btn-diff-med">Medium</button>
-            <button class="btn ${this.selectedDifficulty === 'hard' ? 'active' : ''}" id="btn-diff-hard">Hard</button>
+                  <!-- Jetpack backpack -->
+                  <g class="astro-backpack">
+                    <rect x="70" y="85" width="100" height="95" rx="16" fill="url(#suitDark)" stroke="#475569" stroke-width="2"/>
+                    <rect x="76" y="92" width="22" height="70" rx="10" fill="#1e293b" stroke="#00f0ff" stroke-width="1.5"/>
+                    <rect x="142" y="92" width="22" height="70" rx="10" fill="#1e293b" stroke="#ff007f" stroke-width="1.5"/>
+                    <polygon points="80,180 94,180 98,198 76,198" fill="#334155"/>
+                    <polygon points="146,180 160,180 164,198 142,198" fill="#334155"/>
+                    <ellipse class="thruster-flame flame-left" cx="87" cy="208" rx="8" ry="16" fill="url(#thrusterGlow)" filter="url(#neonGlow)"/>
+                    <ellipse class="thruster-flame flame-right" cx="153" cy="208" rx="8" ry="16" fill="url(#thrusterGlow)" filter="url(#neonGlow)"/>
+                  </g>
+
+                  <!-- Left Leg & Boot -->
+                  <g class="astro-leg-left">
+                    <path d="M92 170 Q80 205 75 235" stroke="url(#suitGrad)" stroke-width="20" stroke-linecap="round" fill="none"/>
+                    <ellipse cx="73" cy="238" rx="14" ry="10" fill="url(#suitDark)" stroke="#00f0ff" stroke-width="2"/>
+                  </g>
+
+                  <!-- Right Leg & Boot -->
+                  <g class="astro-leg-right">
+                    <path d="M148 170 Q160 200 168 230" stroke="url(#suitGrad)" stroke-width="20" stroke-linecap="round" fill="none"/>
+                    <ellipse cx="170" cy="234" rx="14" ry="10" fill="url(#suitDark)" stroke="#ff007f" stroke-width="2"/>
+                  </g>
+
+                  <!-- Suit Torso -->
+                  <g class="astro-body">
+                    <ellipse cx="120" cy="142" rx="42" ry="46" fill="url(#suitGrad)" stroke="#475569" stroke-width="2"/>
+                    <rect x="100" y="125" width="40" height="34" rx="6" fill="#0f172a" stroke="#00f0ff" stroke-width="1.5"/>
+                    <circle class="led-dot led-cyan" cx="109" cy="134" r="3" fill="#00f0ff"/>
+                    <circle class="led-dot led-magenta" cx="120" cy="134" r="3" fill="#ff007f"/>
+                    <circle class="led-dot led-yellow" cx="131" cy="134" r="3" fill="#ffe600"/>
+                    <rect x="106" y="144" width="28" height="6" rx="3" fill="#1e293b"/>
+                    <rect x="106" y="144" width="20" height="6" rx="3" fill="#00f0ff"/>
+                    <polygon points="120,112 124,118 116,118" fill="#ff007f"/>
+                  </g>
+
+                  <!-- Left Arm -->
+                  <g class="astro-arm-left">
+                    <path d="M82 120 Q50 135 45 160" stroke="url(#suitGrad)" stroke-width="15" stroke-linecap="round" fill="none"/>
+                    <circle cx="43" cy="164" r="9" fill="url(#suitDark)" stroke="#00f0ff" stroke-width="1.5"/>
+                  </g>
+
+                  <!-- Right Arm -->
+                  <g class="astro-arm-right">
+                    <path d="M158 120 Q185 110 196 90" stroke="url(#suitGrad)" stroke-width="15" stroke-linecap="round" fill="none"/>
+                    <circle cx="198" cy="86" r="9" fill="url(#suitDark)" stroke="#ff007f" stroke-width="1.5"/>
+                  </g>
+
+                  <!-- Helmet & Visor -->
+                  <g class="astro-helmet">
+                    <ellipse cx="120" cy="98" rx="36" ry="8" fill="#334155" stroke="#64748b" stroke-width="2"/>
+                    <circle cx="120" cy="70" r="46" fill="url(#suitGrad)" stroke="#475569" stroke-width="2.5"/>
+                    <ellipse cx="120" cy="70" rx="35" ry="28" fill="#0a0f1d" stroke="#00f0ff" stroke-width="2"/>
+                    <ellipse class="astro-visor-reflect" cx="120" cy="70" rx="33" ry="26" fill="url(#visorGrad)"/>
+                    <ellipse cx="108" cy="58" rx="18" ry="10" transform="rotate(-15 108 58)" fill="url(#helmetGlare)"/>
+                    <line x1="78" y1="58" x2="64" y2="42" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+                    <circle class="antenna-beacon" cx="62" cy="40" r="4" fill="#ff007f" filter="url(#neonGlow)"/>
+                  </g>
+                </svg>
+              </div>
+            </div>
+            <div class="astronaut-status-badge">
+              <span class="status-pulse-dot"></span>
+              <span class="status-label">COMMANDER // ONLINE</span>
+            </div>
+            <div class="astronaut-subtext">Sistem Navigasi Orbit Aktif</div>
           </div>
-          <button class="btn btn-cyan" id="btn-start-solo" style="width: 100%;">Mulai Game Solo</button>
-        </div>
 
-        <!-- Mode Multiplayer P2P -->
-        <div class="menu-section">
-          <div class="section-title">Multiplayer Online (WebRTC P2P)</div>
-          <button class="btn btn-magenta" id="btn-host-game" style="width: 100%; margin-bottom: 10px;">Host Buat Room</button>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="input-room-code" class="input-box" placeholder="SP-XXXX" maxlength="10" />
-            <button class="btn btn-cyan" id="btn-join-game" style="flex-shrink: 0;">Join</button>
+          <!-- Main Menu Panel -->
+          <div class="glass-panel main-menu-panel">
+            <div class="header-badge-row">
+              <span class="cyber-tag">EXPEDITION 2026</span>
+              <span class="version-tag">v1.0.0</span>
+            </div>
+            <h1 class="game-title">SPACE CONQUEST</h1>
+            <p class="game-subtitle">Taktik Galaksi Real-Time RTS</p>
+
+            <!-- Mode Solo vs AI -->
+            <div class="menu-section cyber-section">
+              <div class="section-header">
+                <span class="section-icon">⚔️</span>
+                <div class="section-title">Mode Solo vs AI</div>
+              </div>
+              <div class="btn-group diff-selector" style="margin-bottom: 12px;">
+                <button class="btn diff-btn ${this.selectedDifficulty === 'easy' ? 'active' : ''}" id="btn-diff-easy">Easy</button>
+                <button class="btn diff-btn ${this.selectedDifficulty === 'medium' ? 'active' : ''}" id="btn-diff-med">Medium</button>
+                <button class="btn diff-btn ${this.selectedDifficulty === 'hard' ? 'active' : ''}" id="btn-diff-hard">Hard</button>
+              </div>
+              <button class="btn btn-cyan btn-glow" id="btn-start-solo" style="width: 100%;">Mulai Game Solo</button>
+            </div>
+
+            <!-- Mode Multiplayer P2P -->
+            <div class="menu-section cyber-section">
+              <div class="section-header">
+                <span class="section-icon">📡</span>
+                <div class="section-title">Multiplayer Online (WebRTC P2P)</div>
+              </div>
+              <button class="btn btn-magenta btn-glow" id="btn-host-game" style="width: 100%; margin-bottom: 10px;">Host Buat Room</button>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="input-room-code" class="input-box cyber-input" placeholder="SP-XXXX" maxlength="10" />
+                <button class="btn btn-cyan btn-glow" id="btn-join-game" style="flex-shrink: 0;">Join</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     `;
+
+    // Interactive mouse parallax for astronaut
+    const astroFloatBox = document.getElementById('astronaut-float-box');
+    if (astroFloatBox) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const { innerWidth, innerHeight } = window;
+        const normX = (e.clientX / innerWidth - 0.5) * 2;
+        const normY = (e.clientY / innerHeight - 0.5) * 2;
+        astroFloatBox.style.transform = `translate3d(${normX * 10}px, ${normY * 10}px, 0) rotateY(${normX * 12}deg) rotateX(${-normY * 10}deg)`;
+      };
+
+      window.addEventListener('mousemove', handleMouseMove);
+      this.menuCleanup = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+      };
+    }
 
     // Bind difficulty selection
     const diffButtons: Record<AIDifficulty, HTMLElement | null> = {
@@ -89,6 +235,7 @@ export class UIManager {
   }
 
   public showLobbyHost(roomCode: string): void {
+    this.clearMenuCleanup();
     this.container.innerHTML = `
       <div class="glass-panel screen-modal">
         <h2 class="game-title" style="font-size: 26px;">ROOM MULTIPLAYER</h2>
@@ -123,6 +270,7 @@ export class UIManager {
   }
 
   public showLobbyGuest(): void {
+    this.clearMenuCleanup();
     this.container.innerHTML = `
       <div class="glass-panel screen-modal">
         <h2 class="game-title" style="font-size: 26px;">MENGHUBUNGKAN...</h2>
@@ -142,6 +290,7 @@ export class UIManager {
   }
 
   public showHUD(isMultiplayer: boolean = false, playerRole: PlanetOwner = 'player1'): void {
+    this.clearMenuCleanup();
     this.container.innerHTML = `
       <div id="hud-top">
         <div class="hud-badge" id="hud-player-badge">
